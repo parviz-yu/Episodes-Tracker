@@ -27,7 +27,7 @@ func NewTestClient(fn RoundTripFunc) *http.Client {
 func TestClient_Update(t *testing.T) {
 	client := NewTestClient(func(req *http.Request) *http.Response {
 		jsonAnswer := `{"ok":true,"result":[{"update_id":1,"message":{"text":"mock text","from":{"username":"mock username","first_name":"mock first name"},"chat":{"id":1}}}]}`
-		assert.Equal(t, req.URL.String(), "https://api.telegram.org/bottoken/getUpdate?limit=100&offset=0")
+		assert.Equal(t, req.URL.String(), "https://api.telegram.org/bottoken/getUpdates?limit=100&offset=0")
 		return &http.Response{
 			Body: io.NopCloser(bytes.NewBufferString(jsonAnswer)),
 		}
@@ -43,7 +43,7 @@ func TestClient_Update(t *testing.T) {
 	p.AddParam("offset", 0)
 	p.AddParam("limit", 100)
 
-	data, err := c.Update(p)
+	data, err := c.Updates(p)
 	assert.NoError(t, err)
 	assert.NotNil(t, data)
 }

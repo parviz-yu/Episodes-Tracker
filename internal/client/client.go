@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	getUpdateMethod   = "getUpdate"
+	getUpdateMethod   = "getUpdates"
 	sendMessageMethod = "sendMessage"
 )
 
@@ -45,8 +45,8 @@ func buildParams(in Params) url.Values {
 	return out
 }
 
-// Update -> limit offset
-func (c *Client) Update(params Params) ([]Update, error) {
+// Updates -> limit offset
+func (c *Client) Updates(params Params) ([]Update, error) {
 	const errMsg = "can't get updates"
 
 	data, err := c.doRequest(getUpdateMethod, params)
