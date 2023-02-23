@@ -12,7 +12,7 @@ import (
 
 const (
 	getUpdateMethod   = "getUpdate"
-	sendMessageMethod = "SendMessage"
+	sendMessageMethod = "sendMessage"
 )
 
 type Client struct {
