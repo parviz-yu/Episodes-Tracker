@@ -16,14 +16,12 @@ type Storage struct {
 }
 
 // New
-func New(path string) (*Storage, error) {
+func New(path string, name string) (*Storage, error) {
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
 		return nil, e.Wrap("can't create folders for storage", err)
 	}
 
-	path = path + "/storage.db"
-
-	db, err := sql.Open("sqlite3", path)
+	db, err := sql.Open("sqlite3", path+name)
 	if err != nil {
 		return nil, e.Wrap("can't open database", err)
 	}
@@ -34,11 +32,17 @@ func New(path string) (*Storage, error) {
 
 	return &Storage{
 		db: db,
-	}, err
+	}, nil
 }
 
 // CreateUser
 func (s *Storage) CreateUser(user *storage.User) error {
+
+	// If user exists we didn't save him again
+	if s.isUserExists(user) {
+		return nil
+	}
+
 	query := `INSERT INTO users(username, telegram_id) VALUES (?, ?)`
 	_, err := s.db.Exec(query, user.Username, user.TelegramID)
 	if err != nil {
@@ -121,10 +125,17 @@ func (s *Storage) ListAllTvShows(userTelegramID int) ([]*storage.TvShow, error) 
 	}
 	defer rows.Close()
 
+	var tempID int
 	res := make([]*storage.TvShow, 0, 1)
 	for rows.Next() {
 		tvShow := new(storage.TvShow)
-		err := rows.Scan(&tvShow.Name, &tvShow.Season, &tvShow.Season)
+		err := rows.Scan(
+			&tempID,
+			&tvShow.Name,
+			&tvShow.Season,
+			&tvShow.Episode,
+			&tvShow.UsersTelegramID,
+		)
 		if err != nil {
 			return nil, e.Wrap(errMsg, err)
 		}
@@ -163,4 +174,13 @@ func (s *Storage) Init() error {
 	}
 
 	return nil
+}
+
+func (s *Storage) isUserExists(user *storage.User) bool {
+	query := `SELECT COUNT(*) FROM users WHERE telegram_id=?`
+
+	var count int
+	s.db.QueryRow(query, user.Username, user.TelegramID).Scan(&count)
+
+	return count > 0
 }
