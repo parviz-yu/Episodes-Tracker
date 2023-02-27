@@ -4,6 +4,7 @@ type Storage interface {
 	CreateUser(*User) error
 	SaveTvShow(*TvShow) error
 	UpdateLastWatchedEpisode(*TvShow) error
+	RemoveTvShow(*TvShow) error
 	IsTvShowExists(*TvShow) (bool, error)
 	ListAllTvShows(int) ([]*TvShow, error)
 }

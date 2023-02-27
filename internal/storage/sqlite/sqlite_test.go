@@ -126,3 +126,19 @@ func TestStorage_ListAllTvShows(t *testing.T) {
 	assert.NotNil(t, result)
 	s.Truncate(t, "tv_shows")
 }
+
+func TestStorage_RemoveTvShows(t *testing.T) {
+	tvShow := storage.TvShow{
+		Name:            "Silicon Valley",
+		Season:          1,
+		Episode:         1,
+		UsersTelegramID: 123354654684564,
+	}
+
+	s := DBHelper(t)
+	s.SaveTvShow(&tvShow)
+
+	err := s.RemoveTvShow(&tvShow)
+	assert.NoError(t, err)
+	s.Truncate(t, "tv_shows")
+}

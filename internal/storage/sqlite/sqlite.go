@@ -150,6 +150,18 @@ func (s *Storage) ListAllTvShows(userTelegramID int) ([]*storage.TvShow, error) 
 	return res, nil
 }
 
+// RemoveTvShow
+func (s *Storage) RemoveTvShow(tvShow *storage.TvShow) error {
+	query := `DELETE FROM tv_shows WHERE name=? AND users_telegram_id=?`
+
+	_, err := s.db.Exec(query, tvShow.Name, tvShow.UsersTelegramID)
+	if err != nil {
+		return e.Wrap("can't remove Tv Show", err)
+	}
+
+	return nil
+}
+
 // Init
 func (s *Storage) Init() error {
 	query := `
