@@ -27,6 +27,9 @@ const (
 	helpCmd  = "/help"
 )
 
+// Represents
+const paginationLimit = 5
+
 var (
 	ErrInvalidInput = errors.New("invalid input")
 )
@@ -44,7 +47,7 @@ func (p *Processor) doCommand(event *events.Event, meta *events.Meta) error {
 		meta.Prefix = ""
 		meta.IsPrefixSet = false
 		params.AddParam("reply_markup", mainKeyboard)
-		if show, ok := meta.ActiveShows[event.ChatID]; ok {
+		if show, ok := meta.ActiveShows[event.ChatID]; ok && show.Name != "" {
 			msg := fmt.Sprintf(msgCancel, show.Name)
 			params.AddParam("text", msg)
 		} else {
@@ -67,7 +70,7 @@ func (p *Processor) doCommand(event *events.Event, meta *events.Meta) error {
 
 	case strings.HasPrefix(text, updCmdA) || strings.HasPrefix(text, updCmdB):
 
-		if _, ok := meta.ActiveShows[event.ChatID]; !ok {
+		if v, ok := meta.ActiveShows[event.ChatID]; !ok || v.Name == "" {
 			params.AddParam("text", msgNoAddedShows)
 			return p.tg.SendMessage(params)
 		}
@@ -84,7 +87,8 @@ func (p *Processor) doCommand(event *events.Event, meta *events.Meta) error {
 		return p.updateTvShow(event, meta)
 
 	case strings.HasSuffix(text, listCmdA) || strings.HasSuffix(text, listCmdB):
-		// TODO: list command
+		meta.PagBegin = 0
+		return p.listTvShows(event, meta)
 
 	case text == startCmd:
 		meta.ActiveShows[event.ChatID] = events.ActiveShow{}
@@ -95,6 +99,32 @@ func (p *Processor) doCommand(event *events.Event, meta *events.Meta) error {
 	default:
 		params.AddParam("text", msgUnknownCommand)
 		return p.tg.SendMessage(params)
+	}
+}
+
+func (p *Processor) listTvShows(event *events.Event, meta *events.Meta) error {
+	shows, err := p.storage.ListAllTvShows(event.ChatID)
+	if err != nil {
+		return e.Wrap("can't list tv shows", err)
+	}
+
+	params := client.Params{}
+	params.AddParam("chat_id", event.ChatID)
+
+	if len(shows) == 0 {
+		params.AddParam("text", msgNoAddedShows)
+		return p.tg.SendMessage(params)
+	}
+
+	meta.SavedShows[event.ChatID] = make([]*storage.TvShow, len(shows))
+	copy(meta.SavedShows[event.ChatID], shows)
+
+	answer, markup := buildInlineList(shows, meta.PagBegin)
+	params.AddParam("text", answer)
+	params.AddParam("reply_markup", *markup)
+
+	if err := p.tg.SendMessage(params); err != nil {
+		return err
 	}
 
 	return nil
@@ -224,10 +254,86 @@ func (p *Processor) addNewUser(event *events.Event) error {
 	params.AddParam("chat_id", event.ChatID)
 	params.AddParam("text", fmt.Sprintf(msgHello, event.FirstName))
 	params.AddParam("parse_mode", "Markdown")
+	params.AddParam("reply_markup", mainKeyboard)
 
 	if err := p.tg.SendMessage(params); err != nil {
 		e.Wrap("can't add new user", err)
 	}
 
 	return nil
+}
+
+// slice, pagBegin
+func buildInlineList(shows []*storage.TvShow, begin int) (string, *events.InlineKeyboardMarkup) {
+	var answer strings.Builder
+
+	baseInline := baseInlineMarkup()
+
+	end := 0
+	if paginationLimit+begin < len(shows) {
+		end = paginationLimit + begin
+	} else {
+		end = len(shows)
+	}
+
+	for i := begin; i < end; i++ {
+		num := strconv.Itoa(i + 1)
+		answer.WriteString(fmt.Sprintf("%s. %s\n", num, shows[i].Name))
+
+		baseInline.Inline[0] = append(
+			baseInline.Inline[0],
+			events.InlineKeyboardButton{
+				Text:     num,
+				Callback: num,
+			},
+		)
+	}
+
+	if begin+paginationLimit < len(shows) {
+		if begin != 0 {
+			baseInline.Inline = append(
+				baseInline.Inline,
+				[]events.InlineKeyboardButton{
+					{
+						Text:     "< Previous",
+						Callback: "Back",
+					},
+					{
+						Text:     "Next >",
+						Callback: "Forward",
+					},
+				},
+			)
+		} else {
+			baseInline.Inline = append(
+				baseInline.Inline,
+				[]events.InlineKeyboardButton{
+					{
+						Text:     "Next >",
+						Callback: "Forward",
+					},
+				},
+			)
+		}
+	}
+
+	if begin != 0 && begin+paginationLimit >= len(shows) {
+		baseInline.Inline = append(
+			baseInline.Inline,
+			[]events.InlineKeyboardButton{
+				{
+					Text:     "< Previous",
+					Callback: "Back",
+				},
+			},
+		)
+	}
+
+	return answer.String(), &baseInline
+}
+
+func baseInlineMarkup() events.InlineKeyboardMarkup {
+	return events.InlineKeyboardMarkup{
+		Inline: make([][]events.InlineKeyboardButton, 1),
+	}
 }

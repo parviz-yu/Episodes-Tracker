@@ -20,6 +20,7 @@ var (
 	ErrUnknownEventType = errors.New("unknown event type")
 )
 
+// New
 func New(client *client.Client, storage storage.Storage) *Processor {
 	return &Processor{
 		tg:      client,
@@ -28,6 +29,7 @@ func New(client *client.Client, storage storage.Storage) *Processor {
 	}
 }
 
+// Fetch
 func (p *Processor) Fetch(limit int, meta *events.Meta) ([]events.Event, error) {
 	params := client.Params{}
 	params.AddParam("offset", p.offset)
@@ -53,6 +55,20 @@ func (p *Processor) Fetch(limit int, meta *events.Meta) ([]events.Event, error) 
 	return res, nil
 }
 
+// Process
+func (p *Processor) Process(event *events.Event, meta *events.Meta) error {
+	switch event.Type {
+	case events.Message:
+		p.doCommand(event, meta)
+	case events.Callback:
+		p.doCallback(event, meta)
+	default:
+		return e.Wrap("can't process event", ErrUnknownEventType)
+	}
+
+	return nil
+}
+
 func event(upd *client.Update, meta *events.Meta) events.Event {
 	updType := fetchType(upd)
 	updText := fetchText(upd)
@@ -67,12 +83,23 @@ func event(upd *client.Update, meta *events.Meta) events.Event {
 		res.FirstName = upd.Message.From.FirstName
 	}
 
+	if updType == events.Callback {
+		res.CallbackID = upd.Callback.ID
+		res.ChatID = upd.Callback.Message.Chat.ID
+		res.Text = upd.Callback.Data
+		res.InlineMsgID = upd.Callback.Message.ID
+	}
+
 	return res
 }
 
 func fetchType(upd *client.Update) events.Type {
-	if upd.Message == nil {
+	if upd.Message == nil && upd.Callback == nil {
 		return events.Unknown
+	}
+
+	if upd.Message == nil {
+		return events.Callback
 	}
 
 	return events.Message
