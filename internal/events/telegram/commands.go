@@ -131,14 +131,9 @@ func (p *Processor) listTvShows(event *events.Event, meta *events.Meta) error {
 }
 
 func (p *Processor) updateTvShow(event *events.Event, meta *events.Meta) error {
-	defer func() {
-		meta.Prefix = ""
-		meta.IsPrefixSet = false
-	}()
-
 	params := client.Params{}
 	params.AddParam("chat_id", event.ChatID)
-	params.AddParam("reply_markup", mainKeyboard)
+	params.AddParam("reply_markup", cancelKeyboard)
 
 	episode, err := strconv.Atoi(strings.SplitN(event.Text, " ", 2)[1])
 	if err != nil {
@@ -165,24 +160,23 @@ func (p *Processor) updateTvShow(event *events.Event, meta *events.Meta) error {
 
 	msg := fmt.Sprintf(msgUpdated, meta.ActiveShows[event.ChatID].Name)
 	params.AddParam("text", msg)
+	params.AddParam("reply_markup", mainKeyboard)
 	if err := p.tg.SendMessage(params); err != nil {
 		return e.Wrap("can't update last watched episode", err)
 	}
+
+	meta.Prefix = ""
+	meta.IsPrefixSet = false
 
 	return nil
 }
 
 func (p *Processor) addNewTvShow(event *events.Event, meta *events.Meta) error {
-	defer func() {
-		meta.Prefix = ""
-		meta.IsPrefixSet = false
-	}()
-
 	errMsg := "can't add new Tv Show"
 
 	params := client.Params{}
 	params.AddParam("chat_id", event.ChatID)
-	params.AddParam("reply_markup", mainKeyboard)
+	params.AddParam("reply_markup", cancelKeyboard)
 
 	// Get inputs after second split
 	inputs := strings.Split(strings.SplitN(event.Text, " ", 2)[1], "/")
@@ -233,9 +227,13 @@ func (p *Processor) addNewTvShow(event *events.Event, meta *events.Meta) error {
 
 	msg := fmt.Sprintf(msgAdded, meta.ActiveShows[event.ChatID].Name)
 	params.AddParam("text", msg)
+	params.AddParam("reply_markup", mainKeyboard)
 	if err := p.tg.SendMessage(params); err != nil {
 		return e.Wrap(errMsg, err)
 	}
+
+	meta.Prefix = ""
+	meta.IsPrefixSet = false
 
 	return nil
 }
