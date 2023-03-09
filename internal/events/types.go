@@ -4,12 +4,12 @@ import "github.com/pyuldashev912/tracker/internal/storage"
 
 // Fetcher
 type Fetcher interface {
-	Fetch(int, *Meta) ([]Event, error)
+	Fetch(int, map[int]*State) ([]Event, error)
 }
 
 // Processor
 type Processor interface {
-	Process(*Event, *Meta) error
+	Process(*Event, map[int]*State) error
 }
 
 // Type represents the type of update from Telegram.
@@ -51,14 +51,14 @@ type ActiveShow struct {
 	Episode int
 }
 
-// Meta stores objects that track user states
-type Meta struct {
-	IsPrefixSet  bool
+// State stores objects that track user states
+type State struct {
+	SavedShows   []*storage.TvShow
 	Prefix       string
-	ActiveShows  map[int]ActiveShow
-	SavedShows   map[int][]*storage.TvShow
+	ActiveShow   ActiveShow
 	PagBegin     int
 	SelectedShow int
+	IsPrefixSet  bool
 }
 
 type ReplyKeyboardMarkup struct {

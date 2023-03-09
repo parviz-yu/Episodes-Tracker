@@ -3,6 +3,7 @@ package telegram
 import (
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/pyuldashev912/tracker/internal/client"
 	"github.com/pyuldashev912/tracker/internal/events"
@@ -30,7 +31,7 @@ func New(client *client.Client, storage storage.Storage) *Processor {
 }
 
 // Fetch
-func (p *Processor) Fetch(limit int, meta *events.Meta) ([]events.Event, error) {
+func (p *Processor) Fetch(limit int, states map[int]*events.State) ([]events.Event, error) {
 	params := client.Params{}
 	params.AddParam("offset", p.offset)
 	params.AddParam("limit", limit)
@@ -47,7 +48,20 @@ func (p *Processor) Fetch(limit int, meta *events.Meta) ([]events.Event, error) 
 	res := make([]events.Event, 0, len(updates))
 
 	for _, upd := range updates {
-		res = append(res, event(&upd, meta))
+		var id int
+		if upd.Message != nil {
+			id = upd.Message.Chat.ID
+		}
+
+		if upd.Callback != nil {
+			id = upd.Callback.Message.Chat.ID
+		}
+
+		if val, ok := states[id]; ok {
+			res = append(res, event(&upd, val.Prefix))
+		} else {
+			res = append(res, event(&upd, ""))
+		}
 	}
 
 	p.offset = updates[len(updates)-1].ID + 1
@@ -56,12 +70,12 @@ func (p *Processor) Fetch(limit int, meta *events.Meta) ([]events.Event, error) 
 }
 
 // Process
-func (p *Processor) Process(event *events.Event, meta *events.Meta) error {
+func (p *Processor) Process(event *events.Event, states map[int]*events.State) error {
 	switch event.Type {
 	case events.Message:
-		p.doCommand(event, meta)
+		p.doCommand(event, states)
 	case events.Callback:
-		p.doCallback(event, meta)
+		p.doCallback(event, states)
 	default:
 		return e.Wrap("can't process event", ErrUnknownEventType)
 	}
@@ -69,12 +83,12 @@ func (p *Processor) Process(event *events.Event, meta *events.Meta) error {
 	return nil
 }
 
-func event(upd *client.Update, meta *events.Meta) events.Event {
+func event(upd *client.Update, prefix string) events.Event {
 	updType := fetchType(upd)
 	updText := fetchText(upd)
 	res := events.Event{
 		Type: updType,
-		Text: fmt.Sprintf("%s %s", meta.Prefix, updText),
+		Text: fmt.Sprintf("%s %s", prefix, updText),
 	}
 
 	if updType == events.Message {
@@ -88,6 +102,7 @@ func event(upd *client.Update, meta *events.Meta) events.Event {
 		res.ChatID = upd.Callback.Message.Chat.ID
 		res.Text = upd.Callback.Data
 		res.InlineMsgID = upd.Callback.Message.ID
+		res.Username = strconv.Itoa(upd.Callback.Message.Chat.ID)
 	}
 
 	return res

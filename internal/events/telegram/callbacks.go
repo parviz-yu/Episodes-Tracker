@@ -12,7 +12,10 @@ import (
 )
 
 // TODO: add return
-func (p *Processor) doCallback(event *events.Event, meta *events.Meta) {
+func (p *Processor) doCallback(event *events.Event, states map[int]*events.State) {
+	defer panicHandler()
+
+	log.Printf("[INFO] got new callback query '%s' from '%s' \n", event.Text, event.Username)
 
 	p.sendAnswer(event)
 
@@ -23,64 +26,63 @@ func (p *Processor) doCallback(event *events.Event, meta *events.Meta) {
 	switch event.Text {
 	case "Back":
 
-		if meta.PagBegin == 0 {
-			meta.PagBegin = 0
+		if states[event.ChatID].PagBegin == 0 {
+			states[event.ChatID].PagBegin = 0
 		} else {
-			meta.PagBegin -= paginationLimit
+			states[event.ChatID].PagBegin -= paginationLimit
 		}
-		answer, markup := buildInlineList(meta.SavedShows[event.ChatID], meta.PagBegin)
+		answer, markup := buildInlineList(states[event.ChatID].SavedShows, states[event.ChatID].PagBegin)
 		params.AddParam("text", answer)
 		params.AddParam("reply_markup", *markup)
 
 	case "Forward":
-		meta.PagBegin += paginationLimit
-		answer, markup := buildInlineList(meta.SavedShows[event.ChatID], meta.PagBegin)
+		states[event.ChatID].PagBegin += paginationLimit
+		answer, markup := buildInlineList(states[event.ChatID].SavedShows, states[event.ChatID].PagBegin)
 		params.AddParam("text", answer)
 		params.AddParam("reply_markup", *markup)
 
 	case "List":
-		answer, markup := buildInlineList(meta.SavedShows[event.ChatID], meta.PagBegin)
+		answer, markup := buildInlineList(states[event.ChatID].SavedShows, states[event.ChatID].PagBegin)
 		params.AddParam("text", answer)
 		params.AddParam("reply_markup", *markup)
 
 	case "Select":
-		show := meta.SavedShows[event.ChatID][meta.SelectedShow]
+		show := states[event.ChatID].SavedShows[states[event.ChatID].SelectedShow]
 		newActiveShow := events.ActiveShow{
 			Name:    show.Name,
 			Season:  show.Season,
 			Episode: show.Episode,
 		}
-		meta.ActiveShows[event.ChatID] = newActiveShow
+		states[event.ChatID].ActiveShow = newActiveShow
 		params.AddParam("text", fmt.Sprintf(msgSelected, newActiveShow.Name))
-		p.tg.SendMessage(params)
-		return
 
 	case "Remove":
-		if err := p.removeTvShow(meta.SavedShows[event.ChatID][meta.SelectedShow]); err != nil {
+		index := states[event.ChatID].SelectedShow
+		tvShow := states[event.ChatID].SavedShows[index]
+		if err := p.removeTvShow(tvShow); err != nil {
 			return
 		}
 
 		params.AddParam(
 			"text",
-			fmt.Sprintf(msgRemoved, meta.SavedShows[event.ChatID][meta.SelectedShow].Name),
+			fmt.Sprintf(msgRemoved, tvShow.Name),
 		)
 
 		// Removing show from active
-		show := meta.SavedShows[event.ChatID][meta.SelectedShow]
-		if show.Name == meta.ActiveShows[event.ChatID].Name {
-			meta.ActiveShows[event.ChatID] = events.ActiveShow{}
+		if tvShow.Name == states[event.ChatID].ActiveShow.Name {
+			states[event.ChatID].ActiveShow = events.ActiveShow{}
 		}
 
 		// Removing show from cache
-		meta.SavedShows[event.ChatID] = append(
-			meta.SavedShows[event.ChatID][:meta.SelectedShow],
-			meta.SavedShows[event.ChatID][meta.SelectedShow+1:]...,
+		states[event.ChatID].SavedShows = append(
+			states[event.ChatID].SavedShows[:index],
+			states[event.ChatID].SavedShows[index+1:]...,
 		)
 
 	default:
 		num, _ := strconv.Atoi(event.Text)
-		meta.SelectedShow = num - 1
-		answer, markup := buildInlineItem(meta.SavedShows[event.ChatID], num)
+		states[event.ChatID].SelectedShow = num - 1
+		answer, markup := buildInlineItem(states[event.ChatID].SavedShows, num)
 
 		params.AddParam("text", answer)
 		params.AddParam("reply_markup", markup)
@@ -148,6 +150,8 @@ func buildInlineItem(shows []*storage.TvShow, number int) (string, *events.Inlin
 }
 
 func panicHandler() {
+	// params := client.Params
+
 	rec := recover()
 	if rec != nil {
 		log.Println("[RECOVER]", rec)

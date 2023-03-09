@@ -34,20 +34,22 @@ var (
 	ErrInvalidInput = errors.New("invalid input")
 )
 
-func (p *Processor) doCommand(event *events.Event, meta *events.Meta) error {
+func (p *Processor) doCommand(event *events.Event, states map[int]*events.State) error {
+	defer panicHandler()
+
 	text := strings.TrimSpace(event.Text)
 
-	log.Printf("got new command '%s' from '%s'", text, event.Username)
+	log.Printf("[INFO] got new command '%s' from '%s' \n", text, event.Username)
 
 	params := client.Params{}
 	params.AddParam("chat_id", event.ChatID)
 
 	switch {
 	case strings.HasSuffix(text, cancelCmdA) || strings.HasSuffix(text, cancelCmdB):
-		meta.Prefix = ""
-		meta.IsPrefixSet = false
+		states[event.ChatID].Prefix = ""
+		states[event.ChatID].IsPrefixSet = false
 		params.AddParam("reply_markup", mainKeyboard)
-		if show, ok := meta.ActiveShows[event.ChatID]; ok && show.Name != "" {
+		if show := states[event.ChatID].ActiveShow; show.Name != "" {
 			msg := fmt.Sprintf(msgCancel, show.Name)
 			params.AddParam("text", msg)
 		} else {
@@ -58,43 +60,45 @@ func (p *Processor) doCommand(event *events.Event, meta *events.Meta) error {
 
 	case strings.HasPrefix(text, addCmdA) || strings.HasPrefix(text, addCmdB):
 
-		if !meta.IsPrefixSet {
+		if !states[event.ChatID].IsPrefixSet {
 			params.AddParam("reply_markup", cancelKeyboard)
 			params.AddParam("text", msgAddInfo)
-			meta.Prefix = "/add"
-			meta.IsPrefixSet = true
+			states[event.ChatID].Prefix = "/add"
+			states[event.ChatID].IsPrefixSet = true
 			return p.tg.SendMessage(params)
 		}
 
-		return p.addNewTvShow(event, meta)
+		return p.addNewTvShow(event, states)
 
 	case strings.HasPrefix(text, updCmdA) || strings.HasPrefix(text, updCmdB):
 
-		if v, ok := meta.ActiveShows[event.ChatID]; !ok || v.Name == "" {
+		if states[event.ChatID].ActiveShow.Name == "" {
 			params.AddParam("text", msgNoAddedShows)
 			return p.tg.SendMessage(params)
 		}
 
-		if !meta.IsPrefixSet {
+		if !states[event.ChatID].IsPrefixSet {
 			params.AddParam("reply_markup", cancelKeyboard)
-			msg := fmt.Sprintf(msgUpdateInfo, meta.ActiveShows[event.ChatID].Name)
+			msg := fmt.Sprintf(msgUpdateInfo, states[event.ChatID].ActiveShow.Name)
 			params.AddParam("text", msg)
-			meta.Prefix = "/upd"
-			meta.IsPrefixSet = true
+			states[event.ChatID].Prefix = "/upd"
+			states[event.ChatID].IsPrefixSet = true
 			return p.tg.SendMessage(params)
 		}
 
-		return p.updateTvShow(event, meta)
+		return p.updateTvShow(event, states)
 
 	case strings.HasSuffix(text, listCmdA) || strings.HasSuffix(text, listCmdB):
-		meta.PagBegin = 0
-		return p.listTvShows(event, meta)
+		states[event.ChatID].PagBegin = 0
+		return p.listTvShows(event, states)
 
 	case text == startCmd:
-		meta.ActiveShows[event.ChatID] = events.ActiveShow{}
+		states[event.ChatID] = &events.State{}
 		return p.addNewUser(event)
 	case text == helpCmd:
 		params.AddParam("text", msgHelp)
+		params.AddParam("parse_mode", "Markdown")
+		params.AddParam("disable_web_page_preview", "True")
 		return p.tg.SendMessage(params)
 	default:
 		params.AddParam("text", msgUnknownCommand)
@@ -102,7 +106,7 @@ func (p *Processor) doCommand(event *events.Event, meta *events.Meta) error {
 	}
 }
 
-func (p *Processor) listTvShows(event *events.Event, meta *events.Meta) error {
+func (p *Processor) listTvShows(event *events.Event, states map[int]*events.State) error {
 	shows, err := p.storage.ListAllTvShows(event.ChatID)
 	if err != nil {
 		return e.Wrap("can't list tv shows", err)
@@ -116,10 +120,10 @@ func (p *Processor) listTvShows(event *events.Event, meta *events.Meta) error {
 		return p.tg.SendMessage(params)
 	}
 
-	meta.SavedShows[event.ChatID] = make([]*storage.TvShow, len(shows))
-	copy(meta.SavedShows[event.ChatID], shows)
+	states[event.ChatID].SavedShows = make([]*storage.TvShow, len(shows))
+	copy(states[event.ChatID].SavedShows, shows)
 
-	answer, markup := buildInlineList(shows, meta.PagBegin)
+	answer, markup := buildInlineList(shows, states[event.ChatID].PagBegin)
 	params.AddParam("text", answer)
 	params.AddParam("reply_markup", *markup)
 
@@ -130,7 +134,7 @@ func (p *Processor) listTvShows(event *events.Event, meta *events.Meta) error {
 	return nil
 }
 
-func (p *Processor) updateTvShow(event *events.Event, meta *events.Meta) error {
+func (p *Processor) updateTvShow(event *events.Event, states map[int]*events.State) error {
 	params := client.Params{}
 	params.AddParam("chat_id", event.ChatID)
 	params.AddParam("reply_markup", cancelKeyboard)
@@ -142,8 +146,8 @@ func (p *Processor) updateTvShow(event *events.Event, meta *events.Meta) error {
 	}
 
 	updatedTvShow := &storage.TvShow{
-		Name:            meta.ActiveShows[event.ChatID].Name,
-		Season:          meta.ActiveShows[event.ChatID].Season,
+		Name:            states[event.ChatID].ActiveShow.Name,
+		Season:          states[event.ChatID].ActiveShow.Season,
 		Episode:         episode,
 		UsersTelegramID: event.ChatID,
 	}
@@ -152,26 +156,26 @@ func (p *Processor) updateTvShow(event *events.Event, meta *events.Meta) error {
 		return e.Wrap("can't update last watched episode", err)
 	}
 
-	meta.ActiveShows[event.ChatID] = events.ActiveShow{
-		Name:    meta.ActiveShows[event.ChatID].Name,
-		Season:  meta.ActiveShows[event.ChatID].Season,
+	states[event.ChatID].ActiveShow = events.ActiveShow{
+		Name:    states[event.ChatID].ActiveShow.Name,
+		Season:  states[event.ChatID].ActiveShow.Season,
 		Episode: episode,
 	}
 
-	msg := fmt.Sprintf(msgUpdated, meta.ActiveShows[event.ChatID].Name)
+	msg := fmt.Sprintf(msgUpdated, updatedTvShow.Name)
 	params.AddParam("text", msg)
 	params.AddParam("reply_markup", mainKeyboard)
 	if err := p.tg.SendMessage(params); err != nil {
 		return e.Wrap("can't update last watched episode", err)
 	}
 
-	meta.Prefix = ""
-	meta.IsPrefixSet = false
+	states[event.ChatID].Prefix = ""
+	states[event.ChatID].IsPrefixSet = false
 
 	return nil
 }
 
-func (p *Processor) addNewTvShow(event *events.Event, meta *events.Meta) error {
+func (p *Processor) addNewTvShow(event *events.Event, states map[int]*events.State) error {
 	errMsg := "can't add new Tv Show"
 
 	params := client.Params{}
@@ -210,7 +214,7 @@ func (p *Processor) addNewTvShow(event *events.Event, meta *events.Meta) error {
 	}
 
 	if exists {
-		msg := fmt.Sprintf(msgAlreadyExists, meta.ActiveShows[event.ChatID].Name)
+		msg := fmt.Sprintf(msgAlreadyExists, show.Name)
 		params.AddParam("text", msg)
 		return p.tg.SendMessage(params)
 	}
@@ -219,21 +223,21 @@ func (p *Processor) addNewTvShow(event *events.Event, meta *events.Meta) error {
 		return e.Wrap(errMsg, err)
 	}
 
-	meta.ActiveShows[event.ChatID] = events.ActiveShow{
+	states[event.ChatID].ActiveShow = events.ActiveShow{
 		Name:    inputs[0],
 		Season:  season,
 		Episode: episode,
 	}
 
-	msg := fmt.Sprintf(msgAdded, meta.ActiveShows[event.ChatID].Name)
+	msg := fmt.Sprintf(msgAdded, show.Name)
 	params.AddParam("text", msg)
 	params.AddParam("reply_markup", mainKeyboard)
 	if err := p.tg.SendMessage(params); err != nil {
 		return e.Wrap(errMsg, err)
 	}
 
-	meta.Prefix = ""
-	meta.IsPrefixSet = false
+	states[event.ChatID].Prefix = ""
+	states[event.ChatID].IsPrefixSet = false
 
 	return nil
 }
@@ -252,6 +256,7 @@ func (p *Processor) addNewUser(event *events.Event) error {
 	params.AddParam("chat_id", event.ChatID)
 	params.AddParam("text", fmt.Sprintf(msgHello, event.FirstName))
 	params.AddParam("parse_mode", "Markdown")
+	params.AddParam("disable_web_page_preview", "True")
 	params.AddParam("reply_markup", mainKeyboard)
 
 	if err := p.tg.SendMessage(params); err != nil {
