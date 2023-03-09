@@ -5,10 +5,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/pyuldashev912/tracker/internal/client"
-	"github.com/pyuldashev912/tracker/internal/consumer"
-	"github.com/pyuldashev912/tracker/internal/events/telegram"
-	"github.com/pyuldashev912/tracker/internal/storage/sqlite"
+	"github.com/pyuldashev912/Episodes-Tracker/internal/client"
+	"github.com/pyuldashev912/Episodes-Tracker/internal/consumer"
+	"github.com/pyuldashev912/Episodes-Tracker/internal/events/telegram"
+	"github.com/pyuldashev912/Episodes-Tracker/internal/storage/sqlite"
 )
 
 func main() {

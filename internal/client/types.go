@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/pyuldashev912/tracker/pkg/e"
+	"github.com/pyuldashev912/Episodes-Tracker/pkg/e"
 )
 
 // Params

@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pyuldashev912/tracker/internal/client"
-	"github.com/pyuldashev912/tracker/internal/events"
-	"github.com/pyuldashev912/tracker/internal/storage"
-	"github.com/pyuldashev912/tracker/pkg/e"
+	"github.com/pyuldashev912/Episodes-Tracker/internal/client"
+	"github.com/pyuldashev912/Episodes-Tracker/internal/events"
+	"github.com/pyuldashev912/Episodes-Tracker/internal/storage"
+	"github.com/pyuldashev912/Episodes-Tracker/pkg/e"
 )
 
 const (

@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/pyuldashev912/tracker/internal/storage"
+	"github.com/pyuldashev912/Episodes-Tracker/internal/storage"
 	"github.com/stretchr/testify/assert"
 )
 

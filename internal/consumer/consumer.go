@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pyuldashev912/tracker/internal/events"
+	"github.com/pyuldashev912/Episodes-Tracker/internal/events"
 )
 
 type Consumer struct {

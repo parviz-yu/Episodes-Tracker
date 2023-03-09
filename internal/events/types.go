@@ -1,6 +1,6 @@
 package events
 
-import "github.com/pyuldashev912/tracker/internal/storage"
+import "github.com/pyuldashev912/Episodes-Tracker/internal/storage"
 
 // Fetcher
 type Fetcher interface {

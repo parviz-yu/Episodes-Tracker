@@ -1,4 +1,4 @@
-module github.com/pyuldashev912/tracker
+module github.com/pyuldashev912/Episodes-Tracker
 
 go 1.19
 

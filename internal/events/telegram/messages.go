@@ -1,12 +1,12 @@
 package telegram
 
-import "github.com/pyuldashev912/tracker/internal/events"
+import "github.com/pyuldashev912/Episodes-Tracker/internal/events"
 
 const msgHelp = `I can help you track and manage the episodes of the TV series you watch.
 
 Just click the '➕ Add' button to add new TV series. Everything is explained underway.
 
-To inform the bot about the last episode you watched, click the '🔄 Update' button to add the episode number.
+To inform the bot about the last episode you watched, please click the '🔄 Update' button to add the episode number.
 
 Forgot which episode you were on? Click '📝 List' to get the last viewed episode for each added TV series.
 
