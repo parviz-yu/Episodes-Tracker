@@ -118,28 +118,26 @@ func (s *Storage) IsTvShowExists(tvShow *storage.TvShow) (bool, error) {
 func (s *Storage) ListAllTvShows(userTelegramID int) ([]*storage.TvShow, error) {
 	errMsg := "can't list TV Shows"
 
-	query := `SELECT * FROM tv_shows WHERE users_telegram_id=?`
+	query := `SELECT name, season, episode FROM tv_shows WHERE users_telegram_id=?`
 	rows, err := s.db.Query(query, userTelegramID)
 	if err != nil {
 		return nil, e.Wrap(errMsg, err)
 	}
 	defer rows.Close()
 
-	var tempID int
-	res := make([]*storage.TvShow, 0, 1)
+	res := make([]*storage.TvShow, 0)
 	for rows.Next() {
 		tvShow := new(storage.TvShow)
 		err := rows.Scan(
-			&tempID,
 			&tvShow.Name,
 			&tvShow.Season,
 			&tvShow.Episode,
-			&tvShow.UsersTelegramID,
 		)
 		if err != nil {
 			return nil, e.Wrap(errMsg, err)
 		}
 
+		tvShow.UsersTelegramID = userTelegramID
 		res = append(res, tvShow)
 	}
 
@@ -192,7 +190,7 @@ func (s *Storage) isUserExists(user *storage.User) bool {
 	query := `SELECT COUNT(*) FROM users WHERE telegram_id=?`
 
 	var count int
-	s.db.QueryRow(query, user.Username, user.TelegramID).Scan(&count)
+	s.db.QueryRow(query, user.TelegramID).Scan(&count)
 
 	return count > 0
 }

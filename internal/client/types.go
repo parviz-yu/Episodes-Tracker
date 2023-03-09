@@ -31,6 +31,7 @@ func (p Params) AddParam(key string, value interface{}) error {
 
 // User
 type User struct {
+	ID        int    `json:"id"`
 	Username  string `json:"username"`
 	FirstName string `json:"first_name"`
 }
@@ -42,15 +43,24 @@ type Chat struct {
 
 // IncomingMessage
 type IncomingMessage struct {
+	ID   int    `json:"message_id"`
 	Text string `json:"text"`
 	From User   `json:"from"`
 	Chat Chat   `json:"chat"`
 }
 
+// CallbackQuery
+type CallbackQuery struct {
+	ID      string           `json:"id"`
+	Data    string           `json:"data"`
+	Message *IncomingMessage `Json:"message"`
+}
+
 // Update
 type Update struct {
-	ID      int              `json:"update_id"`
-	Message *IncomingMessage `json:"message"`
+	ID       int              `json:"update_id"`
+	Message  *IncomingMessage `json:"message"`
+	Callback *CallbackQuery   `json:"callback_query"`
 }
 
 // UpdateResponse

@@ -11,8 +11,10 @@ import (
 )
 
 const (
-	getUpdateMethod   = "getUpdates"
-	sendMessageMethod = "sendMessage"
+	getUpdateMethod           = "getUpdates"
+	sendMessageMethod         = "sendMessage"
+	editMessageTextMethod     = "editMessageText"
+	answerCallbackQueryMethod = "answerCallbackQuery"
 )
 
 type Client struct {
@@ -71,6 +73,24 @@ func (c *Client) SendMessage(params Params) error {
 	_, err := c.doRequest(sendMessageMethod, params)
 	if err != nil {
 		return e.Wrap("can't send message", err)
+	}
+
+	return nil
+}
+
+func (c *Client) EditMessageText(params Params) error {
+	_, err := c.doRequest(editMessageTextMethod, params)
+	if err != nil {
+		return e.Wrap("can't edit message", err)
+	}
+
+	return nil
+}
+
+func (c *Client) AnswerCallbackQuery(params Params) error {
+	_, err := c.doRequest(answerCallbackQueryMethod, params)
+	if err != nil {
+		return e.Wrap("can't answer to callbak", err)
 	}
 
 	return nil
